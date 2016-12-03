@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Graph</title>
+	<style type="text/css">
+		#canvas	{
+			background-color: #eee;
+			display: none;
+		}
+
+		#canvasMST	{
+			background-color: black;
+			display: none;
+		}
+		body {
+			font-family: calibri,sans-serif;
+		}
+	</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas><br>
+<section id="traversalData"></section>
+<canvas id="canvasMST"></canvas>
+<div id="takeInput">
+		<h2>Enter number of nodes</h2>
+		<input type="number" id="nodes" min="1" max="20">
+		<h2>Enter number of edges</h2>
+		<input type="number" id="edges" min="1"><br><br>
+		<input type="radio" name="graphType" id="undi" checked>Undirected<br>
+		<input type="radio" name="graphType" id="di">Directed<br>
+		<button id="btn1" onclick="getEdges()">Submit</button>
+
+		<div id="showNext" style="display:none">
+		    <h2>Enter the starting node for BFS and DFS</h2><br>
+			<select id="bfsInput" value="1"></select>
+			<h2>Enter initial vertex</h2><br>
+			<select id="edgeBeginValues" ></select>
+			<h2>Enter terminal vertex</h2><br>
+			<select id="edgeEndValues" ></select>
+			<h2>Enter edge weight</h2><br>
+			<input type="number" id="edgeWeight"  value="1"/><br>
+			<button id="btn2" onclick="getNextEdge()"></button>
+		</div>
+
+</div>
+<script type="text/javascript" src="traversal.js"></script>
+<script type="text/javascript">
+// canvas for drawing the graph
+	var canvas = document.getElementById('canvas');
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	var ctx = canvas.getContext('2d');
+
+	//canvas for drawing minimum spanning tree
+	var canvasMST = document.getElementById('canvasMST');
+	canvasMST.width = window.innerWidth;
+	canvasMST.height = window.innerHeight;
+	var ctxMST = canvasMST.getContext('2d');	
+
+	/*num_nodes : No of nodes entered by the user
+	  num_edges : No of edges entered by the user
+		edgesArray : Stores the user input for adjacent nodes
+		count : Stores the number of edges between a pair of nodes
+		countEdgesEntered : Keeps track of the number of edges entered by the user. Incremented after each input*/
+	var num_nodes,num_edges,edgesArray=[],count=[],count1 = [],count2 = [];
+	var countEdgesEntered = 1;
+	var bfsStart=1;
+
+	//Function to receive user input for number of nodes and edges and validate it
+	function getEdges()	{
+
+		var options = "";		//the innerHTML for the select tag
+		num_nodes = document.getElementById('nodes').value;                 //stores the number of nodes
+		num_edges = document.getElementById('edges').value;                 //stores the number of edges
+		initGraph();				//initializes the graph with visited values as false and an empty adjacency list for each node
+		for(var i=0;i<num_nodes;i++)	{
+			options+="<option value="+(i+1)+">"+(i+1)+"</option>";
+		}
+		//user input validation
+		if(num_nodes == "" || num_edges == "" || num_nodes <0 || num_edges<0)	{
+			alert("Invalid Input");
+			location.reload();
+		}
+		if(num_nodes == 0)	{
+			alert("Empty graph!! Enter at least one node!!");
+			location.reload();
+		}
+		if(num_edges!=0)	{
+			document.getElementById('edgeBeginValues').innerHTML = options;
+			document.getElementById('edgeEndValues').innerHTML = options;
+			document.getElementById('bfsInput').innerHTML = options;
+			document.getElementById('btn2').innerHTML = "Submit values for edge 1";
+			document.getElementById('showNext').style.display = "block";
+		}
+		else	{
+			/*if number of edges is zero, proceed to draw the graph without taking any further input. Just draw the nodes*/
+			drawGraph();
+		}
+
+	}
+
+		//Function which is called every time the user submits a new edge entry
+	function getNextEdge()	{
+
+		
+
+		var initialVertex = document.getElementById('edgeBeginValues').value;
+		var terminalVertex = document.getElementById('edgeEndValues').value;
+		var weight = document.getElementById('edgeWeight').value;
+
+		//push the values into the adjacency list for the graph
+		graphNodes[initialVertex-1].connections.push(terminalVertex-1);
+		//the following if block gets executed only for undirected graphs 
+		if (document.getElementById('undi').checked)	{
+			graphNodes[terminalVertex-1].connections.push(initialVertex-1);  //here in an undirected graph if A->B is a connection then B->A is also a connection  so pushing the values the other way also
+
+			if(initialVertex!=terminalVertex)   {    //this block is specifically to create a reduced weight list for MST
+	     		//console.log("yay  "+initialVertex+"   "+terminalVertex);
+				for(var i=0;i<weightList.length;i++)
+				{
+					if(((weightList[i].src==initialVertex)&&(weightList[i].dest==terminalVertex))||((weightList[i].src==terminalVertex)&&(weightList[i].dest==initialVertex)))
+					{
+						if(weightList[i].wgt>weight)    //if the weight of the repeated incoming edge is less than the existing ,replace the edge or else dont
+							weightList[i].wgt=weight;
+						break;
+					}
+				}
+				if(i==weightList.length)      //if the incoming edge is not repeated then push it into weightList array
+				weightList.push({"wgt" : weight,"src" : initialVertex,"dest" : terminalVertex});
+     		}
+
+     		if(edgesArray.length == 0)	{         //if the edgesArray is empty then directly push the incoming nodes into it..initialization part
+				edgesArray.push(initialVertex);
+				edgesArray.push(terminalVertex);
+				count[0] = 1;
+				weightsToPrint[0] = [];
+				weightsToPrint[0].push(weight);
+			}
+			else	{        //this else part is to check if the incoming nodes are already present in the edgesArray.if yes dont push just increase the count
+				for(var i=0;i<edgesArray.length;i++)	{
+					//the following if block checks if multiple edges are there
+					if(edgesArray[i] == initialVertex)	{
+						if((i%2==0 && edgesArray[i+1]==terminalVertex)||(i%2==1 && edgesArray[i-1]==terminalVertex))	{
+							count[Math.floor(i/2)]++;
+							weightsToPrint[Math.floor(i/2)].push(weight);
+							break;
+						}
+					}
+				}
+				if(i==edgesArray.length)	{ //if the incoming nodes are not paired already in edgesArray push them into the array
+					weightsToPrint[count.length] = [];
+					weightsToPrint[count.length].push(weight);
+					count.push(Number(1));
+					edgesArray.push(initialVertex);
+					edgesArray.push(terminalVertex);
+				}
+			}	
+		}
+		// if graph is directed
+		else {
+			if(edgesArray.length == 0)	{    //initial pushing of values into the arrays 
+				edgesArray.push(initialVertex);
+				edgesArray.push(terminalVertex);
+				weightsToPrint1[0] = [];
+				weightsToPrint2[0] = [];
+				weightsToPrint1[0].push(weight);
+				count1[0] = 1;
+				count2[0] = 0;
+			}
+			else	{
+				for(var i=0;i<edgesArray.length;i++) {
+					//the following if block checks if multiple edges are present.if yes just inc. count,and push inside weightsToPrint arrays
+
+					if(edgesArray[i] == initialVertex)	
+					{
+						if(i%2==0 && edgesArray[i+1]==terminalVertex)	{
+							count1[Math.floor(i/2)]++;
+							weightsToPrint1[Math.floor(i/2)].push(weight);
+							break;
+						}
+						else if(i%2==1 && edgesArray[i-1]==terminalVertex){
+							weightsToPrint2[Math.floor(i/2)].push(weight);
+							count2[Math.floor(i/2)]++;
+							break;
+						}
+					}
+				}
+				if(i==edgesArray.length)	{ //if the matching is not found then push it in
+					weightsToPrint1[count1.length] = [];
+					weightsToPrint2[count2.length] = [];
+					weightsToPrint1[count1.length].push(weight);
+					count1.push(Number(1));
+					count2.push(Number(0));
+					edgesArray.push(initialVertex);
+					edgesArray.push(terminalVertex);
+				}
+			}
+		}
+
+		if(countEdgesEntered == num_edges)	{ 
+			//if all the edges have been entered, proceed to drawing graph
+			//document.getElementById("bfsMsg").style.display="block";
+			//document.getElementById("bfsInput").style.display="block";
+
+			//document.getElementById("bfsInputTaken").style.display = "block";
+			//document.getElementById("bfsInputTaken").addEventListener('click', function() {
+				bfsStart = document.getElementById("bfsInput").value;
+				drawGraph();
+			}
+
+		else	{
+			//increment the number of edges entered
+			countEdgesEntered++;
+			document.getElementById('btn2').innerHTML = "Submit values for edge "+countEdgesEntered;
+		}
+	}
+
+
+	var points = [];
+
+	function drawGraph()	{
+		document.getElementById('takeInput').style.display = "none";
+		canvas.style.display = "block";
+
+		/*semiMajorAxis : semi major axis of ellipse on which the nodes will be plotted
+		semiMinorAxis : semi major axis of ellipse on which the nodes will be plotted
+		theta : angle between successive nodes(with respect to director circle)
+		centerX,centerY : coordinates for center of the canvas
+		points : array to store the coordinates of the nodes*/
+		var semiMajorAxis = canvas.width/2 - 60,semiMinorAxis = canvas.height/2 - 60;
+		var theta = 2*Math.PI/num_nodes;
+		var angle = theta;
+		var centerX = canvas.width/2,centerY = canvas.height/2;
+		points.push(centerX + semiMajorAxis);
+		points.push(centerY);		//coordinates for first node stored
+
+		//stores the coordinates of all the nodes into points array
+		for(var i=0;i<num_nodes-1;i++)	{
+			var x_next = centerX + semiMajorAxis*Math.cos(angle);
+			var y_next = centerY - semiMinorAxis*Math.sin(angle);
+			points.push(x_next);
+			points.push(y_next);
+			angle+=theta;
+		}
+
+		if (document.getElementById('undi').checked)	{
+			
+			for(var i=0;i<edgesArray.length;i+=2) {
+
+				//if there are loops in the graph(where initial and terminal vertex refer to the same node)
+				if(edgesArray[i] == edgesArray[i+1])	{
+					var radiusLoop = 20;			//radius of the loop
+					for(var j=0;j<count[i/2];j++)	{
+						ctx.beginPath();
+						ctx.arc(points[2*edgesArray[i]-2]+radiusLoop*Math.cos(theta*(edgesArray[i]-1)),points[2*edgesArray[i]-1]-radiusLoop*Math.sin(theta*(edgesArray[i]-1)),radiusLoop,0,2*Math.PI);
+						ctx.stroke();
+						ctx.fillStyle = "green";
+						ctx.font = "10px Verdana";
+						ctx.fillText(weightsToPrint[i/2][j],points[2*edgesArray[i]-2]+(2*(radiusLoop+4)*Math.cos(theta*(edgesArray[i]-1))),points[2*edgesArray[i]-1]-(2*(radiusLoop+4)*Math.sin(theta*(edgesArray[i]-1))));  //to show weight values on the edges
+						radiusLoop+=8;
+					}
+				}
+				//when the initial and terminal vertex are distinct
+				else {
+
+					var midX = (points[2*edgesArray[i]-2] + points[2*edgesArray[i+1]-2])/2; //midX,midY : midpoint of the initialVertex and terminalVertex
+					var midY = (points[2*edgesArray[i]-1] + points[2*edgesArray[i+1]-1])/2;
+					ctx.beginPath();
+					
+					ctx.moveTo(points[2*edgesArray[i]-2],points[2*edgesArray[i]-1]);       //drawing the straight line between the given nodes first
+					ctx.lineTo(points[2*edgesArray[i+1]-2],points[2*edgesArray[i+1]-1]);
+					ctx.stroke();
+					ctx.font = "15px Verdana";
+					ctx.fillStyle = "green";
+					ctx.fillText(weightsToPrint[i/2][0],midX+2,midY+2);
+
+					//checks if there are multiple edges between these nodes
+					if(count[i/2]>1) {
+
+							/*alpha : slope of normal to the line joining the nodes
+							sinAlpha,cosAlpha : sine and cosine values for alpha respectively
+							height : perpendicular distance of control point from the (midX,midY)*/
+						
+						var alpha = Math.atan2(points[2*edgesArray[i]-2] - points[2*edgesArray[i+1]-2], points[2*edgesArray[i+1]-1] - points[2*edgesArray[i]-1]);
+						var sinAlpha = Math.sin(alpha);
+						var cosAlpha = Math.cos(alpha);
+						var height = 50;
+						var ctrlX = midX + height*cosAlpha,ctrlY =  midY + height*sinAlpha;
+						for(var j=0;j<count[i/2]-1;j++)	{
+							//draw the multiple edges
+							ctx.beginPath();
+							ctx.moveTo(points[2*edgesArray[i]-2],points[2*edgesArray[i]-1]);
+							ctx.quadraticCurveTo(ctrlX, ctrlY,points[2*edgesArray[i+1]-2],points[2*edgesArray[i+1]-1]);
+							sinAlpha = -sinAlpha;    //these two following lines are to flip the direction of alternate edges
+							cosAlpha = -cosAlpha; 
+							if(j%2==1) {
+								height += 50;        //after two edges one in each side ..increase the height of the parabolic curve 
+							}
+							 var midPointX = (ctrlX + midX)/2;
+							 var midPointY = (ctrlY + midY)/2;
+
+							
+							ctx.fillText(weightsToPrint[i/2][j+1],midPointX+2,midPointY+2);
+							
+
+							
+							ctrlX = midX + height*cosAlpha;
+							ctrlY = midY + height*sinAlpha;
+							ctx.stroke();
+
+						}
+					}
+				}
+			}
+		}
+		// for directed graph
+		else {
+			for(var i=0;i<edgesArray.length;i+=2) {
+
+
+				//if there are loops in the graph(where initial and terminal vertex refer to the same node)
+				if(edgesArray[i] == edgesArray[i+1])	{
+					var radiusLoop = 20;			//radius of the loop
+					for(var j=0;j<count1[i/2];j++)	{
+						ctx.beginPath();
+						ctx.arc(points[2*edgesArray[i]-2]+radiusLoop*Math.cos(theta*(edgesArray[i]-1)),points[2*edgesArray[i]-1]-radiusLoop*Math.sin(theta*(edgesArray[i]-1)),radiusLoop,0,2*Math.PI);
+						ctx.stroke();
+						ctx.fillStyle = "green";
+						ctx.font = "10px Verdana";
+						ctx.fillText(weightsToPrint1[i/2][j],points[2*edgesArray[i]-2]+(2*(radiusLoop+4)*Math.cos(theta*(edgesArray[i]-1))),points[2*edgesArray[i]-1]-(2*(radiusLoop+4)*Math.sin(theta*(edgesArray[i]-1))));
+						radiusLoop+=8;
+					}
+				}
+				//when the initial and terminal vertex are distinct
+				else {
+
+					/*midX,midY : midpoint of the initialVertex and terminalVertex
+						beta : slope of the line joining the nodes
+						alpha : slope of normal to the line joining the nodes*/
+					var midX = (points[2*edgesArray[i]-2] + points[2*edgesArray[i+1]-2])/2;
+					var midY = (points[2*edgesArray[i]-1] + points[2*edgesArray[i+1]-1])/2;
+					var alpha = Math.atan2(points[2*edgesArray[i]-2] - points[2*edgesArray[i+1]-2], points[2*edgesArray[i+1]-1] - points[2*edgesArray[i]-1]);
+					var beta = alpha - (Math.PI/2);
+
+					ctx.beginPath();
+					ctx.moveTo(points[2*edgesArray[i]-2],points[2*edgesArray[i]-1]);
+					ctx.lineTo(points[2*edgesArray[i+1]-2],points[2*edgesArray[i+1]-1]);
+					ctx.stroke();
+					
+
+					//draw the arrowhead to indicate direction of the edge
+					ctx.translate(midX,midY);
+					ctx.rotate(beta);
+					ctx.moveTo(0, 0);
+					ctx.lineTo(20*Math.cos(Math.PI/6), 20*Math.sin(Math.PI/6));
+					ctx.moveTo(0,0);
+					ctx.lineTo(20*Math.cos(Math.PI/6), 20*Math.sin(-Math.PI/6));
+					ctx.stroke();
+
+					ctx.fillStyle = "green";
+					ctx.font = "10px Verdana";
+					ctx.fillText(weightsToPrint1[i/2][0],0,-2);
+
+					ctx.rotate(-beta);
+					ctx.translate(-midX,-midY);
+
+
+					if((count1[i/2]>1)||(count2[i/2]>0)) {
+						//draw the multiple edges
+						/*sinAlpha,cosAlpha : sine and cosine values for alpha respectively
+						height : perpendicular distance of control point from the (midX,midY)
+						ctrlX,ctrlY : coordinates of the control point for the quadratic curve*/
+						var sinAlpha = Math.sin(alpha);
+						var cosAlpha = Math.cos(alpha);
+						var height = 50;
+						var ctrlX= midX + height*cosAlpha;
+						var ctrlY= midY + height*sinAlpha;
+
+						var j=0;
+						for(var k=0;k<count1[i/2]-1;k++)	{
+
+							ctx.beginPath();
+							ctx.moveTo(points[2*edgesArray[i]-2],points[2*edgesArray[i]-1]);
+							ctx.quadraticCurveTo(ctrlX, ctrlY,points[2*edgesArray[i+1]-2],points[2*edgesArray[i+1]-1]);
+							sinAlpha = -sinAlpha;
+							cosAlpha = -cosAlpha;
+
+							if(j%2==1) {
+								height += 50;
+							}
+
+							ctx.stroke();
+							//arrowPointX,arrowPointY : midpoint of curve, where the arrowhead is to be drawn
+							var arrowPointX = (ctrlX + midX)/2;
+							var arrowPointY = (ctrlY + midY)/2;
+
+							//draw the arrowhead
+							ctx.translate(arrowPointX,arrowPointY);
+							ctx.rotate(beta);
+							ctx.moveTo(0, 0);
+							ctx.lineTo(20*Math.cos(Math.PI/6), 20*Math.sin(Math.PI/6));
+							ctx.moveTo(0,0);
+							ctx.lineTo(20*Math.cos(Math.PI/6), 20*Math.sin(-Math.PI/6))
+							ctx.stroke();
+							ctx.fillStyle = "green";
+						    ctx.font = "10px Verdana";
+							ctx.fillText(weightsToPrint1[(i/2)][(Number(k+1))],2,-2);
+							ctx.rotate(-beta);
+							ctx.translate(-arrowPointX,-arrowPointY);
+
+							//update the control point to draw the next multiple edge
+							ctrlX = midX + height*cosAlpha;
+							ctrlY = midY + height*sinAlpha;
+							j++;
+
+
+						}
+
+						//draw the oppositely directed edges
+						for(var k=0;k<count2[i/2];k++)
+						{
+							ctx.beginPath();
+							ctx.moveTo(points[2*edgesArray[i]-2],points[2*edgesArray[i]-1]);
+							ctx.quadraticCurveTo(ctrlX, ctrlY,points[2*edgesArray[i+1]-2],points[2*edgesArray[i+1]-1]);
+							sinAlpha = -sinAlpha;
+							cosAlpha = -cosAlpha;
+							if(j%2==1) {
+								height += 50;
+							}
+							ctx.stroke();
+
+							//arrowPointX,arrowPointY : midpoint of curve, where the arrowhead is to be drawn
+							var arrowPointX = (ctrlX + midX)/2;
+							var arrowPointY = (ctrlY + midY)/2;
+
+							//draw the arrowhead
+							ctx.translate(arrowPointX,arrowPointY);
+							ctx.rotate(beta);
+							ctx.moveTo(0, 0);
+							ctx.lineTo(20*Math.cos(5*Math.PI/6), 20*Math.sin(5*Math.PI/6));
+							ctx.moveTo(0,0);
+							ctx.lineTo(20*Math.cos(5*Math.PI/6), 20*Math.sin(-5*Math.PI/6))
+							ctx.stroke();
+							ctx.fillStyle = "green";
+							ctx.font = "10px Verdana";
+							ctx.fillText(weightsToPrint2[i/2][k],-2,-2);
+							ctx.rotate(-beta);
+							ctx.translate(-arrowPointX,-arrowPointY);
+
+							//update the control point to draw the next multiple edge
+							ctrlX = midX + height*cosAlpha;
+							ctrlY = midY + height*sinAlpha;
+							j++;
+						}
+					}
+				}
+			}
+		}
+
+		dfs(Number(bfsStart));
+		bfs(Number(bfsStart));
+
+		if (document.getElementById('undi').checked) {
+
+			var isMSTPossible = kruskal();
+			if(isMSTPossible)	{
+				drawMST();	
+			}
+			else 	{
+				traversalData += "<h2>MST is not possible for the entered graph</h2>";
+				document.getElementById('traversalData').innerHTML = traversalData;
+			}
+			
+		}
+
+		//draw the nodes
+		for(var i=0;i<2*num_nodes;i+=2)	{
+			ctx.beginPath();
+			ctx.fillStyle = "red";
+			ctx.arc(points[i],points[i+1],15,0,2*Math.PI);
+			ctx.fill();
+			ctx.fillStyle = "yellow";
+			ctx.font = "20px Georgia";
+			ctx.fillText(i/2+1,points[i]-5,points[i+1]+5);
+		}
+	}
+
+	function drawMST()	{
+		console.log("Inside drawMST");
+		ctxMST.beginPath();
+		ctxMST.strokeStyle = "green";
+		ctxMST.lineWidth = 2;
+		for(var k =0;k<num_nodes;k++)	{
+			ctxMST.moveTo(points[2*k],points[(2*k)+1]);
+			for(var l=0;l<mst[k].connections.length;l++){
+				ctxMST.lineTo(points[2*mst[k].connections[l]],points[(2*mst[k].connections[l])+1]);
+				ctxMST.moveTo(points[2*k],points[(2*k)+1]);
+			}
+		}
+		ctxMST.stroke();
+		
+		for(var i=0;i<2*num_nodes;i+=2)	{
+			ctxMST.beginPath();
+			ctxMST.fillStyle = "red";
+			ctxMST.arc(points[i],points[i+1],15,0,2*Math.PI);
+			ctxMST.fill();
+			ctxMST.fillStyle = "yellow";
+			ctxMST.font = "20px Georgia";
+			ctxMST.fillText(i/2+1,points[i]-5,points[i+1]+5);
+		}
+		canvasMST.style.display = "block";
+	}
+	
+</script>
+</body>
+</html>		
